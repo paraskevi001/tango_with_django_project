@@ -3,7 +3,7 @@ from rango.models import Category, Page
 from rango.models import Choice,Question
 # Register your models here.
 
-admin.site.register(Category)
+
 
 	
 class PageAdmin(admin.ModelAdmin):
@@ -33,4 +33,8 @@ class QuestionAdmin(admin.ModelAdmin):
 	
 admin.site.register(Question,QuestionAdmin)
 
+class CategoryAdmin(admin.ModelAdmin):
+	prepopulated_fields={'slug':('name',)}
+	
+admin.site.register(Category,CategoryAdmin)
 
