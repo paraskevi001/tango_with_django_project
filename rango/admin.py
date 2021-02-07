@@ -8,7 +8,7 @@ from rango.models import Choice,Question
 	
 class PageAdmin(admin.ModelAdmin):
 	fieldsets = [
-        (None,               {'fields': ['title']}),
+        (None,{'fields': ['title']}),
         (None,{'fields':['url']}),
     	] 
 	
