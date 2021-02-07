@@ -1,15 +1,15 @@
 from django.shortcuts import render
-
-from django.http import HttpResponse
-
+from django.http import HttpResponse, HttpResponseRedirect
 from rango.models import Category
-
 from rango.models import Page
+from rango.forms import CategoryForm,PageForm
+from django.shortcuts import redirect
 
-
-from rango.models import Question
+from rango.models import Choice,Question
 from django.template import loader
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
+from django.views import generic
 
 def index(request):
 	# Query the database for a list of ALL categories currently stored.
@@ -63,25 +63,85 @@ def show_category(request, category_name_slug):
 	#Go render the response and return it to client
 	return render(request, 'rango/category.html', context=context_dict)
 	
-def detail(request , question_id):
-	question = get_object_or_404(Question, pk=question_id)
-	return render(request, 'rango/detail.html', {'question': question})
-
-def results(request, question_id):
-	response="You're looking at the results of question %s."
-	return HttpResponse(response % question_id)
 	
+def add_category(request):
+	form=CategoryForm()
+	
+	#A HTTP POST
+	if request.method=='POST':
+		form=CategoryForm(request.POST)
+		#Have we been provided with a valid form?
+		if form.is_valid():
+			#save the new category to the database
+			form.save(commit=True)
+			#now that the category is saved, we could confirm this
+			#for now, redirect the user back to the index view
+			return redirect('/rango/')
+		else:
+		#the supplied form contained errors-just print them to the terminal
+			print(form.errors)
+		#Will handle the bad form,new form or no form supplied cases
+		#Render the form with error messages(if any)
+	return render(request, 'rango/add_category.html', {'form': form})
+		
+def add_page(request, category_name_slug):
+	try:
+		category=Category.objects.get(slug=category_name_slug)
+	except Category.DoesNotExist:
+		category=None
+	
+	#You cannot add a page to a category that does not exist
+	if category is None:
+		return redirect('/rango/')
+	
+	form=PageForm()
+	
+	if request.method=='POST':
+		form=PageForm(request.POST)
+		
+		if form.is_valid():
+			if category:
+				page=form.save(commit=False)
+				page.category=category
+				page.views=0
+				page.save()
+				return redirect(reverse('rango:show_category',
+					kwargs={'category_name_slug':category_name_slug}))
+		else:
+			print(form.errors)
+				
+	context_dict={'form':form,'category':category}
+	return render(request, 'rango/add_page.html', context=context_dict)
+
+
+class Index2View(generic.ListView):
+	template_name='rango/index2.html'
+	context_object_name = 'latest_question_list'
+	
+	def get_queryset(self):
+		"""Return the last five published questions."""
+		return Question.objects.order_by('-pub_date')[:5]
+
+class DetailView(generic.DetailView):
+	model=Question
+	template_name='rango/detail.html'
+	
+class ResultsView(generic.DetailView):
+	model=Question
+	template_name='rango/results.html'
+
 def vote(request, question_id):
-	return HttpResponse("You're voting on question %s." % question_id)
-
-def index2(request):
-	latest_question_list = Question.objects.order_by('-pub_date')[:5]
-	context = {'latest_question_list': latest_question_list}
-	return render(request, 'rango/index2.html', context)
-
-
-	
-	
-	
+	question = get_object_or_404(Question, pk=question_id)
+	try:
+		selected_choice = question.choice_set.get(pk=request.POST['choice'])
+	except(KeyError, Choice.DoesNotExist):
+		return render(request, 'rango/detail.html', {
+            'question': question,
+            'error_message': "You didn't select a choice.",
+        })
+	else:
+        	selected_choice.votes += 1
+        	selected_choice.save()
+        	return HttpResponseRedirect(reverse('rango:results', args=(question.id,)))	
 	
 	
